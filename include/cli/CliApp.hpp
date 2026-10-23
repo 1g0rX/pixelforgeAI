@@ -5,6 +5,7 @@
 #include "animation/Animation.hpp"
 #include "tools/ToolRegistry.hpp"
 #include "agent/AgentLoop.hpp"
+#include "core/Config.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,8 +23,11 @@ public:
     void print_banner() const;
     void print_sprite_preview() const;
     bool export_output(const std::string& filepath);
+    bool switch_profile(const std::string& profile_name);
 
 private:
+    void init_backend();
+    core::Config config_;
     sprite::Sprite sprite_;
     sprite::History history_;
     std::shared_ptr<animation::Animation> animation_;

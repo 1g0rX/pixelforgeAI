@@ -1,0 +1,150 @@
+{
+  // =========================================================================
+  // PIXELFORGE AI - CONFIGURAÇÃO DE MODELOS E MOTOR
+  // =========================================================================
+  // Este arquivo permite selecionar o provedor do modelo de IA e os limites de sprite.
+  //
+  // FORMAS DE USAR:
+  //
+  //   MÉTODO 1 (Mais fácil): Altere "active_profile" abaixo para o perfil desejado:
+  //     - "ollama"       -> Ollama local (padrão: http://localhost:11434/v1)
+  //     - "lmstudio"     -> LM Studio local (padrão: http://localhost:1234/v1)
+  //     - "vllm"         -> vLLM local (padrão: http://localhost:8000/v1)
+  //     - "llamacpp"     -> llama.cpp server (padrão: http://localhost:8080/v1)
+  //     - "jan"          -> Jan.ai local (padrão: http://localhost:1337/v1)
+  //     - "textgen_webui"-> Text Generation WebUI (padrão: http://localhost:5000/v1)
+  //     - "openrouter"   -> OpenRouter (remoto - requer chave api_key)
+  //     - "openai"       -> OpenAI (remoto - requer chave api_key)
+  //     - "groq"         -> Groq (remoto - ultra rápido, requer chave api_key)
+  //     - "mock"         -> Backend procedural interno (funciona sem qualquer LLM instalado!)
+  //
+  //   MÉTODO 2: Ou descomente e edite diretamente o bloco "backend" na seção inferior.
+  // =========================================================================
+
+  // Perfil selecionado (escolha um dos nomes definidos em "profiles" abaixo)
+  "active_profile": "jan",
+
+  // --- PERFIS PRÉ-CONFIGURADOS ---
+  "profiles": {
+
+    // 1. Ollama (padrão local mais comum)
+    "ollama": {
+      "type": "http",
+      "api_url": "http://localhost:11434/v1",
+      "api_key": "none",
+      "model": "gemma-4-e4b",     // ou "llama3.2", "qwen2.5-coder", "mistral", etc.
+      "temperature": 0.2,
+      "timeout_seconds": 90
+    },
+
+    // 2. LM Studio (servidor local com GUI fácil)
+    "lmstudio": {
+      "type": "http",
+      "api_url": "http://localhost:1234/v1",
+      "api_key": "none",
+      "model": "auto",            // "auto" detecta e usa automaticamente o modelo carregado no LM Studio!
+      "temperature": 0.2,
+      "timeout_seconds": 300
+    },
+
+    // 3. vLLM (servidor local de alta performance)
+    "vllm": {
+      "type": "http",
+      "api_url": "http://localhost:8000/v1",
+      "api_key": "none",
+      "model": "google/gemma-2-9b-it",
+      "temperature": 0.2,
+      "timeout_seconds": 60
+    },
+
+    // 4. llama.cpp server (binário ./llama-server)
+    "llamacpp": {
+      "type": "http",
+      "api_url": "http://localhost:8080/v1",
+      "api_key": "none",
+      "model": "default",
+      "temperature": 0.2,
+      "timeout_seconds": 90
+    },
+
+    // 5. Jan.ai (interface desktop local - servidor em localhost:1337)
+    "jan": {
+      "type": "http",
+      "api_url": "http://localhost:1337/v1",
+      "api_key": "none",
+      "model": "auto",            // "auto" detecta e usa automaticamente o modelo de chat ativo no Jan!
+      "temperature": 0.2,
+      "timeout_seconds": 180
+    },
+
+    // 6. Text Generation WebUI (Oobabooga com extensão openai ativada)
+    "textgen_webui": {
+      "type": "http",
+      "api_url": "http://localhost:5000/v1",
+      "api_key": "none",
+      "model": "default",
+      "temperature": 0.2,
+      "timeout_seconds": 90
+    },
+
+    // 7. OpenRouter (remoto - dezenas de modelos abertos e proprietários)
+    "openrouter": {
+      "type": "http",
+      "api_url": "https://openrouter.ai/api/v1",
+      "api_key": "COLOQUE_SUA_CHAVE_AQUI",
+      "model": "google/gemma-2-9b-it",
+      "temperature": 0.2,
+      "timeout_seconds": 60
+    },
+
+    // 8. OpenAI Oficial (remoto)
+    "openai": {
+      "type": "http",
+      "api_url": "https://api.openai.com/v1",
+      "api_key": "COLOQUE_SUA_CHAVE_AQUI",
+      "model": "gpt-4o-mini",
+      "temperature": 0.2,
+      "timeout_seconds": 60
+    },
+
+    // 9. Groq (remoto - inferência rápida com Llama 3 / Gemma)
+    "groq": {
+      "type": "http",
+      "api_url": "https://api.groq.com/openai/v1",
+      "api_key": "COLOQUE_SUA_CHAVE_AQUI",
+      "model": "llama-3.3-70b-versatile",
+      "temperature": 0.2,
+      "timeout_seconds": 45
+    },
+
+    // 10. Mock (Sem LLM - planejador procedural interno para testes locais offline)
+    "mock": {
+      "type": "mock",
+      "model": "procedural-mock",
+      "temperature": 0.0,
+      "timeout_seconds": 5
+    }
+  },
+
+  // =========================================================================
+  // CONFIGURAÇÃO DO MOTOR DE SPRITE
+  // =========================================================================
+  "sprite": {
+    "default_width": 32,
+    "default_height": 32,
+    "max_width": 512,        // Limite máximo de largura (pode aumentar se necessário)
+    "max_height": 512        // Limite máximo de altura
+  },
+
+  // =========================================================================
+  // CONFIGURAÇÃO DO AGENTE E OTIMIZAÇÃO DE CONTEXTO
+  // =========================================================================
+  "agent": {
+    "max_iterations": 15,          // Número máximo de turnos/tentativas de autocorreção
+    "context_mode": "smart",       // "smart" (seleciona ferramentas relevantes, economiza até 85% de tokens),
+                                   // "minimal" (apenas 8-10 ferramentas essenciais, ideal para modelos 1B/3B),
+                                   // "full" (envia todas as 43 ferramentas, ideal para GPT-4o ou Claude com 128k)
+    "max_history_turns": 3,        // Quantidade de turnos anteriores retidos antes de compactar
+    "compact_tool_output": true    // Formatação concisa de telemetria para reduzir consumo de contexto
+  }
+}

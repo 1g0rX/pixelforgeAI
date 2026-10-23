@@ -8,7 +8,9 @@
 #include "io/PngIO.hpp"
 #include "io/GifIO.hpp"
 #include "io/SpriteSheetIO.hpp"
+#include "core/Config.hpp"
 #include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <sstream>
 
@@ -29,21 +31,75 @@ namespace colors {
 CliApp::CliApp()
     : sprite_(32, 32, "default_sprite"),
       history_(50) {
+    // Carrega configuração centralizada
+    config_ = core::Config::discover_and_load();
+
+    // Usa tamanho default do config para o sprite inicial
+    sprite_ = sprite::Sprite(config_.default_sprite_width, config_.default_sprite_height, "default_sprite");
+
     registry_ = std::make_shared<tools::ToolRegistry>();
     tools::register_primitive_tools(*registry_);
     tools::register_semantic_tools(*registry_);
     animation::register_animation_tools(*registry_);
 
-    // Check backend preference
-    const char* backend_env = std::getenv("PIXELFORGE_BACKEND");
-    if (backend_env && std::string(backend_env) == "http") {
-        backend_ = std::make_shared<agent::HttpAgentBackend>();
+    init_backend();
+}
+
+void CliApp::init_backend() {
+    if (config_.backend == "http") {
+        agent::HttpBackendConfig http_cfg;
+        http_cfg.base_url        = config_.api_url;
+        http_cfg.api_key         = config_.api_key;
+        http_cfg.model           = config_.model;
+        http_cfg.temperature     = config_.temperature;
+        http_cfg.timeout_seconds = config_.timeout_seconds;
+        backend_ = std::make_shared<agent::HttpAgentBackend>(http_cfg);
     } else {
         backend_ = std::make_shared<agent::MockAgentBackend>();
     }
 
     agent_loop_ = std::make_unique<agent::AgentLoop>(backend_, registry_);
+    agent_loop_->set_max_iterations(config_.max_agent_iterations);
+
+    agent::OptimizationOptions opt;
+    opt.mode = config_.context_mode;
+    opt.max_history_turns = config_.max_history_turns;
+    opt.compact_tool_output = config_.compact_tool_output;
+    opt.compact_history = (config_.context_mode != "full");
+    agent_loop_->set_optimization_options(opt);
+
     setup_callbacks();
+}
+
+bool CliApp::switch_profile(const std::string& profile_name) {
+    std::string config_path = "pixelforge.json";
+    if (!std::filesystem::exists(config_path)) {
+        if (const char* home = std::getenv("HOME")) {
+            config_path = std::string(home) + "/.config/pixelforge/pixelforge.json";
+        }
+    }
+
+    if (std::filesystem::exists(config_path)) {
+        std::ifstream file(config_path);
+        if (file.is_open()) {
+            try {
+                nlohmann::json j = nlohmann::json::parse(file, nullptr, true, true, true);
+                if (j.contains("profiles") && j["profiles"].contains(profile_name)) {
+                    const auto& p = j["profiles"][profile_name];
+                    if (p.contains("type"))            config_.backend = p["type"].get<std::string>();
+                    if (p.contains("api_url"))         config_.api_url = p["api_url"].get<std::string>();
+                    if (p.contains("api_key"))         config_.api_key = p["api_key"].get<std::string>();
+                    if (p.contains("model"))           config_.model   = p["model"].get<std::string>();
+                    if (p.contains("temperature"))     config_.temperature = p["temperature"].get<double>();
+                    if (p.contains("timeout_seconds")) config_.timeout_seconds = p["timeout_seconds"].get<int>();
+                    config_.active_profile = profile_name;
+                    init_backend();
+                    return true;
+                }
+            } catch (...) {}
+        }
+    }
+    return false;
 }
 
 void CliApp::setup_callbacks() {
@@ -84,7 +140,10 @@ void CliApp::print_banner() const {
               << "╚════════════════════════════════════════════════════════════════╝\n"
               << colors::RESET
               << colors::GRAY << " Backend ativo: " << backend_->backend_name() << "\n"
+              << " Modelo: " << config_.model << "\n"
+              << " Sprite máximo: " << config_.max_sprite_width << "x" << config_.max_sprite_height << "\n"
               << " Ferramentas registradas: " << registry_->tools().size() << "\n"
+              << " Otimização de contexto: " << config_.context_mode << " (economia de tokens ativa)\n"
               << colors::RESET << "\n";
 }
 
@@ -150,19 +209,34 @@ bool CliApp::export_output(const std::string& filepath) {
 void CliApp::print_help() const {
     std::cout << "Comandos suportados:\n"
               << "  create [w] [h] [name]        - Cria um novo canvas de sprite\n"
-              << "  open <arquivo.png>           - Abre um arquivo PNG existente\n"
+              << "  open <arquivo.png>           - Abre um arquivo PNG existente para análise/edição\n"
               << "  prompt \"<texto>\"             - Envia uma solicitação para a IA\n"
               << "  animate \"<texto>\"            - Solicita uma animação para a IA\n"
               << "  export <arquivo.png|.gif>    - Exporta sprite, animação GIF ou sprite sheet\n"
-              << "  info                         - Exibe o estado textual e preview ASCII\n"
+              << "  info                         - Exibe o estado textual, paleta e preview ASCII\n"
+              << "  profile <nome>               - Troca de provedor/modelo em tempo de execução (ex: profile lmstudio)\n"
+              << "  config                       - Exibe a configuração ativa em JSON\n"
+              << "  config init                  - Gera um pixelforge.json de exemplo no diretório atual\n"
               << "  undo                         - Desfaz a última ação\n"
               << "  redo                         - Refaz a ação desfeita\n"
               << "  repl                         - Inicia sessão interativa\n"
               << "  help                         - Exibe esta ajuda\n"
+              << "\nOpções de linha de comando:\n"
+              << "  --profile, -p <nome>         - Seleciona o perfil de modelo ativo (ex: --profile lmstudio)\n"
+              << "\nPerfis pré-configurados em pixelforge.json:\n"
+              << "  ollama, lmstudio, vllm, llamacpp, jan, textgen_webui, openrouter, openai, groq, mock\n"
+              << "\nConfiguração (pixelforge.json - lido em tempo de execução SEM compilar):\n"
+              << "  Basta editar pixelforge.json e rodar o programa. Nenhuma compilação é necessária!\n"
+              << "  O PixelForge procura pixelforge.json em:\n"
+              << "    1. Diretório atual (./pixelforge.json)\n"
+              << "    2. ~/.config/pixelforge/pixelforge.json\n"
+              << "  Variáveis de ambiente sobrescrevem o arquivo.\n"
               << "\nVariáveis de ambiente suportadas:\n"
               << "  PIXELFORGE_BACKEND=http      - Ativa backend HTTP para LLMs locais (Ollama / vLLM)\n"
               << "  PIXELFORGE_API_URL           - Endpoint da API (padrão: http://localhost:11434/v1)\n"
-              << "  PIXELFORGE_MODEL             - Nome do modelo (padrão: gemma-4-e4b)\n";
+              << "  PIXELFORGE_MODEL             - Nome do modelo (padrão: gemma-4-e4b)\n"
+              << "  PIXELFORGE_API_KEY           - Chave de API (padrão: none)\n"
+              << "  PIXELFORGE_MAX_SPRITE        - Tamanho máximo de sprite (ex: 1024 = 1024x1024)\n";
 }
 
 void CliApp::run_interactive_repl() {
@@ -213,6 +287,29 @@ void CliApp::run_interactive_repl() {
             } catch (const std::exception& e) {
                 std::cout << colors::RED << "Erro ao abrir PNG: " << e.what() << colors::RESET << "\n";
             }
+        } else if (cmd == "config init") {
+            auto example = core::Config::example_json();
+            std::ofstream out("pixelforge.json");
+            if (out.is_open()) {
+                out << example.dump(2) << "\n";
+                out.close();
+                std::cout << colors::GREEN << "✔ Arquivo pixelforge.json gerado no diretório atual.\n"
+                          << colors::GRAY << "  Edite-o para configurar modelo, backend, limites, etc.\n" << colors::RESET;
+            } else {
+                std::cout << colors::RED << "✖ Erro ao criar pixelforge.json\n" << colors::RESET;
+            }
+        } else if (cmd == "config") {
+            std::cout << colors::BOLD << "Configuração ativa:" << colors::RESET << "\n"
+                      << config_.to_json().dump(2) << "\n";
+        } else if (cmd.rfind("profile ", 0) == 0 || cmd.rfind("use ", 0) == 0) {
+            std::string pname = (cmd.rfind("profile ", 0) == 0) ? cmd.substr(8) : cmd.substr(4);
+            if (switch_profile(pname)) {
+                std::cout << colors::GREEN << "✔ Perfil alterado para '" << pname << "' ("
+                          << backend_->backend_name() << ")" << colors::RESET << "\n";
+            } else {
+                std::cout << colors::RED << "✖ Perfil '" << pname << "' não encontrado em pixelforge.json\n"
+                          << colors::GRAY << "  Perfis disponíveis: ollama, lmstudio, vllm, llamacpp, jan, openrouter, openai, groq, mock\n" << colors::RESET;
+            }
         } else {
             // Treat as natural language prompt
             execute_prompt(cmd);
@@ -224,6 +321,22 @@ int CliApp::run(int argc, char* argv[]) {
     if (argc <= 1) {
         run_interactive_repl();
         return 0;
+    }
+
+    // Suporte a flag --profile <nome> ou -p <nome>
+    if (argc >= 3 && (std::string(argv[1]) == "--profile" || std::string(argv[1]) == "-p")) {
+        std::string pname = argv[2];
+        if (switch_profile(pname)) {
+            std::cout << colors::GREEN << "[Perfil ativo: " << pname << " (" << backend_->backend_name() << ")]" << colors::RESET << "\n";
+        } else {
+            std::cerr << colors::RED << "Aviso: Perfil '" << pname << "' não encontrado em pixelforge.json.\n" << colors::RESET;
+        }
+        argc -= 2;
+        argv += 2;
+        if (argc <= 1) {
+            run_interactive_repl();
+            return 0;
+        }
     }
 
     std::string subcmd = argv[1];
@@ -283,6 +396,26 @@ int CliApp::run(int argc, char* argv[]) {
 
     if (subcmd == "info") {
         print_sprite_preview();
+        return 0;
+    }
+
+    if (subcmd == "config") {
+        if (argc > 2 && std::string(argv[2]) == "init") {
+            auto example = core::Config::example_json();
+            std::ofstream out("pixelforge.json");
+            if (out.is_open()) {
+                out << example.dump(2) << "\n";
+                out.close();
+                std::cout << colors::GREEN << "✔ Arquivo pixelforge.json gerado no diretório atual.\n"
+                          << colors::GRAY << "  Edite-o para configurar modelo, backend, limites, etc.\n" << colors::RESET;
+            } else {
+                std::cerr << colors::RED << "✖ Erro ao criar pixelforge.json\n" << colors::RESET;
+                return 1;
+            }
+        } else {
+            std::cout << colors::BOLD << "Configuração ativa:" << colors::RESET << "\n"
+                      << config_.to_json().dump(2) << "\n";
+        }
         return 0;
     }
 
