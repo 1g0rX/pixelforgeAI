@@ -27,7 +27,7 @@ public:
     ToolResult execute_tool(const std::string& name, ExecutionContext& ctx, const nlohmann::json& args);
 
     // Schemas for AI Agents (OpenAI/Ollama format)
-    nlohmann::json get_tools_schema() const;
+    nlohmann::json get_tools_schema(const std::vector<std::string>& allowed_prefixes = {}) const;
     std::string get_tools_documentation() const;
 
     const std::unordered_map<std::string, std::unique_ptr<ITool>>& tools() const {

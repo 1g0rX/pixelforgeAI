@@ -129,13 +129,43 @@ ToolResult ToolRegistry::execute_tool(const std::string& name, ExecutionContext&
     return res;
 }
 
-nlohmann::json ToolRegistry::get_tools_schema() const {
+nlohmann::json ToolRegistry::get_tools_schema(const std::vector<std::string>& allowed_prefixes) const {
     nlohmann::json tools_array = nlohmann::json::array();
     for (const auto& [name, tool] : tools_) {
+        // Se houver filtro, verifica se bate o nome do tool OU prefixo de permissão
+        if (!allowed_prefixes.empty()) {
+            bool matches = false;
+            for (const auto& filter : allowed_prefixes) {
+                if (name == filter) {
+                    matches = true;
+                    break;
+                }
+                for (const auto& perm : tool->required_permissions()) {
+                    if (perm.rfind(filter, 0) == 0) {
+                        matches = true;
+                        break;
+                    }
+                }
+                if (matches) break;
+            }
+            if (!matches) continue;
+        }
+
         nlohmann::json func;
         func["name"] = name;
         func["description"] = tool->description();
-        func["parameters"] = tool->parameter_schema();
+        
+        nlohmann::json params = tool->parameter_schema();
+        if (!params.is_object()) {
+            params = nlohmann::json::object();
+        }
+        if (!params.contains("type")) {
+            params["type"] = "object";
+        }
+        if (!params.contains("properties") || !params["properties"].is_object()) {
+            params["properties"] = nlohmann::json::object();
+        }
+        func["parameters"] = params;
 
         nlohmann::json entry;
         entry["type"] = "function";

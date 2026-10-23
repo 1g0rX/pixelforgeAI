@@ -36,7 +36,7 @@ std::string SpriteStateSummary::to_text_format(bool include_ascii) const {
         ss << palette_hex[i] << (i + 1 < palette_hex.size() ? ", " : "\n");
     }
 
-    if (include_ascii && !ascii_art.empty()) {
+    if (include_ascii && !bounding_box.is_empty() && !ascii_art.empty()) {
         ss << "\nASCII Matrix Preview:\n";
         if (!ascii_legend.empty()) {
             ss << "Legend:\n" << ascii_legend << "\n";

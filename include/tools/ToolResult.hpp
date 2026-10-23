@@ -34,13 +34,25 @@ struct ToolResult {
         };
     }
 
-    std::string to_string() const {
+    std::string to_string(bool compact = false) const {
         std::string res = success ? "[SUCCESS] " : "[FAILED] ";
         res += message;
         if (!data.empty()) {
             res += "\nData: " + data.dump();
         }
-        res += "\n" + analysis.to_string();
+        if (compact) {
+            if (!analysis.is_valid() || !analysis.warnings.empty() || analysis.isolated_pixel_count > 0) {
+                res += "\n" + analysis.to_string();
+            } else {
+                res += " (valid, bbox=[" + std::to_string(analysis.bounding_box.x) + "," +
+                       std::to_string(analysis.bounding_box.y) + " " +
+                       std::to_string(analysis.bounding_box.width) + "x" +
+                       std::to_string(analysis.bounding_box.height) + "], colors=" +
+                       std::to_string(analysis.color_count) + ")";
+            }
+        } else {
+            res += "\n" + analysis.to_string();
+        }
         return res;
     }
 };

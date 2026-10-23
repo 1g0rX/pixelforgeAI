@@ -1,5 +1,6 @@
 #include "tools/PrimitiveTools.hpp"
 #include "sprite/SpriteState.hpp"
+#include "core/Config.hpp"
 #include <format>
 
 namespace pixelforge::tools {
@@ -13,11 +14,14 @@ public:
     }
     std::vector<std::string> required_permissions() const override { return {"sprite:create"}; }
     nlohmann::json parameter_schema() const override {
+        auto cfg = core::Config::discover_and_load();
         return {
             {"type", "object"},
             {"properties", {
-                {"width", {{"type", "integer"}, {"description", "Width of the sprite in pixels (e.g. 16, 32, 64)"}}},
-                {"height", {{"type", "integer"}, {"description", "Height of the sprite in pixels (e.g. 16, 32, 64)"}}},
+                {"width", {{"type", "integer"}, {"description",
+                    std::format("Width of the sprite in pixels (1-{}, e.g. 16, 32, 64)", cfg.max_sprite_width)}}},
+                {"height", {{"type", "integer"}, {"description",
+                    std::format("Height of the sprite in pixels (1-{}, e.g. 16, 32, 64)", cfg.max_sprite_height)}}},
                 {"name", {{"type", "string"}, {"description", "Name of the sprite"}}},
                 {"background_color", {{"type", "string"}, {"description", "Hex background color (optional, default transparent '#00000000')"}}}
             }},
@@ -25,6 +29,10 @@ public:
         };
     }
     ToolResult execute(ExecutionContext& ctx, const nlohmann::json& args) override {
+        auto cfg = core::Config::discover_and_load();
+        int max_w = cfg.max_sprite_width;
+        int max_h = cfg.max_sprite_height;
+
         int w = args["width"].get<int>();
         int h = args["height"].get<int>();
         std::string sname = args.value("name", "sprite");
@@ -33,8 +41,8 @@ public:
             bg = core::Color::from_hex(args["background_color"].get<std::string>());
         }
 
-        if (w <= 0 || h <= 0 || w > 512 || h > 512) {
-            return ToolResult::fail("Dimensions must be between 1 and 512");
+        if (w <= 0 || h <= 0 || w > max_w || h > max_h) {
+            return ToolResult::fail(std::format("Dimensions must be between 1x1 and {}x{}", max_w, max_h));
         }
 
         ctx.sprite = sprite::Sprite(w, h, sname, bg);
