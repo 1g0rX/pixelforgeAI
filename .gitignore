@@ -1,4 +1,65 @@
+# =============================================================================
+# PixelForge AI - .gitignore
+# =============================================================================
+
+# Build directories & CMake artifacts
 build/
-output*
+bin/
+lib/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile.cmake
+install_manifest.txt
+compile_commands.json
+
+# Compiled object files & libraries
 *.o
+*.obj
 *.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Root / Local compiled binaries
+pixel-forge
+pixel-forge-tests
+pixel-forge-example
+
+# Temporary outputs & test exports
+output*
+hero_bob.gif
+hero_example.png
+*.tmp
+*.log
+/tmp/*
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Editor & IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.directory
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment & Secrets (defense-in-depth)
+.env
+.env.*
+*.key
+*.pem

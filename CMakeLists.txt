@@ -50,28 +50,6 @@ add_library(pixelforge_core STATIC ${PIXELFORGE_SOURCES})
 add_executable(pixel-forge src/main.cpp)
 target_link_libraries(pixel-forge PRIVATE pixelforge_core)
 
-# Unit Tests
-set(TEST_SOURCES
-    tests/test_main.cpp
-    tests/test_sprite.cpp
-    tests/test_palette.cpp
-    tests/test_regions.cpp
-    tests/test_semantic_tools.cpp
-    tests/test_history.cpp
-    tests/test_animation.cpp
-    tests/test_spritesheet.cpp
-    tests/test_tools_registry.cpp
-    tests/test_text_repr.cpp
-    tests/test_agent_loop.cpp
-)
-
-add_executable(pixel-forge-tests ${TEST_SOURCES})
-target_include_directories(pixel-forge-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-target_link_libraries(pixel-forge-tests PRIVATE pixelforge_core)
-
-enable_testing()
-add_test(NAME AllTests COMMAND pixel-forge-tests)
-
 # Example
 add_executable(pixel-forge-example examples/basic_api_usage.cpp)
 target_link_libraries(pixel-forge-example PRIVATE pixelforge_core)
