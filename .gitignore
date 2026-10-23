@@ -32,6 +32,7 @@ pixel-forge-example
 output*
 hero_bob.gif
 hero_example.png
+scripts/
 *.tmp
 *.log
 /tmp/*
